@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApi } from "@/lib/api";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { getDataProvider } from "@/lib/providers";
 import { filtersSchema } from "@/lib/search/filters";
 
@@ -7,6 +8,8 @@ import { filtersSchema } from "@/lib/search/filters";
 export async function POST(req: Request) {
   const ctx = await requireApi();
   if (ctx instanceof NextResponse) return ctx;
+  const limited = await enforceRateLimit(`search:${ctx.userId}`, 90, 60);
+  if (limited) return limited;
 
   const body = await req.json().catch(() => ({}));
   const parsed = filtersSchema.safeParse(body ?? {});

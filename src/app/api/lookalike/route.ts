@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApi } from "@/lib/api";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { getDataProvider } from "@/lib/providers";
 
 const schema = z.object({
@@ -13,6 +14,8 @@ const schema = z.object({
 export async function POST(req: Request) {
   const ctx = await requireApi();
   if (ctx instanceof NextResponse) return ctx;
+  const limited = await enforceRateLimit(`lookalike:${ctx.userId}`, 40, 60);
+  if (limited) return limited;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 

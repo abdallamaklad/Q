@@ -21,9 +21,11 @@ export default async function LoginPage() {
           <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Creator intelligence, engineered</p>
         </div>
         <LoginForm />
-        <p className="text-center text-xs text-muted-foreground">
-          Demo account: <span className="font-medium text-foreground">demo@qulture.dev</span> / <span className="font-medium text-foreground">demo1234</span>
-        </p>
+        {process.env.NEXT_PUBLIC_DEMO_MODE === "true" && (
+          <p className="text-center text-xs text-muted-foreground">
+            Demo account: <span className="font-medium text-foreground">demo@qulture.dev</span> / <span className="font-medium text-foreground">demo1234</span>
+          </p>
+        )}
         <p className="text-center text-xs text-muted-foreground">
           No account? <Link href="/register" className="text-primary underline">Create one</Link>
         </p>

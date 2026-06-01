@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { requireApi } from "@/lib/api";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { prisma } from "@/lib/db";
 
 /**
@@ -14,6 +15,8 @@ interface Row { brand: string; mentions: number; creators: number; engagement: b
 export async function GET(req: Request) {
   const ctx = await requireApi();
   if (ctx instanceof NextResponse) return ctx;
+  const limited = await enforceRateLimit(`sov:${ctx.userId}`, 60, 60);
+  if (limited) return limited;
 
   const sp = new URL(req.url).searchParams;
   const category = sp.get("category")?.trim() || null;

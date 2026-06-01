@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApi } from "@/lib/api";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { prisma } from "@/lib/db";
 import { pairwiseOverlap, combinedUniqueReach, type Distribution } from "@/lib/scoring";
 
@@ -10,6 +11,8 @@ const schema = z.object({ creatorIds: z.array(z.string()).min(2).max(5) });
 export async function POST(req: Request) {
   const ctx = await requireApi();
   if (ctx instanceof NextResponse) return ctx;
+  const limited = await enforceRateLimit(`overlap:${ctx.userId}`, 40, 60);
+  if (limited) return limited;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Select 2–5 creators" }, { status: 400 });
 

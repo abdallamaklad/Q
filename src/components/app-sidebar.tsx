@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Search, Copy, GitCompare, ListChecks, Megaphone, LineChart, ShieldAlert, Sparkles, Radio,
+  Search, Copy, GitCompare, ListChecks, Megaphone, LineChart, ShieldAlert, Sparkles, Radio, DownloadCloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { QWordmark } from "@/components/brand/logo";
@@ -19,15 +19,18 @@ const NAV = [
   { href: "/roadmap", label: "Roadmap", icon: Sparkles },
 ];
 
-export function AppSidebar() {
+const ADMIN_NAV = [{ href: "/ingest", label: "Ingest Data", icon: DownloadCloud }];
+
+export function AppSidebar({ role }: { role?: string }) {
   const pathname = usePathname();
+  const nav = role === "admin" ? [...NAV, ...ADMIN_NAV] : NAV;
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r bg-card md:flex">
       <div className="flex h-14 items-center border-b px-5">
         <QWordmark className="text-2xl" />
       </div>
       <nav className="flex-1 space-y-1 p-3">
-        {NAV.map((item) => {
+        {nav.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (

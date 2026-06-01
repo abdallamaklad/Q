@@ -24,7 +24,9 @@ export const QUEUE_NAMES = {
   analytics: "qulture-analytics",
 } as const;
 
-export type IngestionJobName = "fetch" | "normalize" | "score" | "embed" | "upsert";
+// Ingestion pipeline jobs: `discover` (keyword search → enqueue per-channel
+// `ingest` jobs) and `ingest` (fetch → normalize → score → embed → upsert one channel).
+export type IngestionJobName = "discover" | "ingest";
 export type AnalyticsJobName = "refresh-account" | "recompute-predictions";
 
 const globalForQueue = globalThis as unknown as {

@@ -146,6 +146,7 @@ async function main() {
         growthRate: g.growthRate,
         aiGeneratedScore: g.aiGeneratedScore,
         verified: g.verified,
+        source: "mock",
       });
       creatorEmb.push({ id: creatorId, embedding: g.embedding });
 

@@ -1,69 +1,52 @@
 import { Worker, Queue, type Job } from "bullmq";
-import { redisConnection, QUEUE_NAMES, type IngestionJobName } from "@/lib/queue";
+import type { Platform } from "@prisma/client";
+import { redisConnection, QUEUE_NAMES } from "@/lib/queue";
+import { getConnector, upsertCreatorBundle } from "@/lib/ingestion";
 
 /**
- * Ingestion pipeline skeleton: fetch → normalize → score → embed → upsert.
+ * Real ingestion pipeline. Two job types:
+ *   discover { platform, query, limit } → connector.discover → enqueue one
+ *            `ingest` job per channel found.
+ *   ingest   { platform, externalId?, handle? } → connector.ingestChannel
+ *            (fetch → normalize → score → embed) → upsertCreatorBundle.
  *
- * Each stage enqueues the next so the pipeline is observable and resumable.
- * Stages are intentionally stubbed with clear TODO markers — wire them to your
- * licensed / first-party data feeds. The shapes below mirror what MockProvider
- * already produces (see src/lib/providers/mock-data.ts), so the upsert stage
- * can write into the same schema the rest of the app reads.
+ * Reads serve from the same Postgres tables, so ingested creators appear in
+ * search immediately with real metrics + scores (audience is flagged estimated).
  */
-
-interface PipelinePayload {
-  accountId?: string;
-  source?: string; // e.g. "youtube", "licensed-feed-x"
-  stage: IngestionJobName;
-  raw?: unknown; // carried between stages
-  normalized?: unknown;
-}
+interface DiscoverData { platform: Platform; query: string; limit?: number }
+interface IngestData { platform: Platform; externalId?: string; handle?: string }
+type PipelineData = DiscoverData | IngestData;
 
 const queue = new Queue(QUEUE_NAMES.ingestion, { connection: redisConnection() });
 
-async function handle(job: Job<PipelinePayload>): Promise<void> {
-  const data = job.data;
-  switch (job.name as IngestionJobName) {
-    case "fetch": {
-      // TODO(ingestion): fetch raw records from the external/licensed source,
-      // respecting that source's rate limits and pagination.
-      console.log(`[ingestion] fetch ${data.accountId ?? data.source ?? ""}`);
-      await queue.add("normalize", { ...data, stage: "normalize", raw: { placeholder: true } });
-      break;
+async function handle(job: Job<PipelineData>): Promise<void> {
+  if (job.name === "discover") {
+    const { platform, query, limit = 10 } = job.data as DiscoverData;
+    const refs = await getConnector(platform).discover(query, limit);
+    console.log(`[ingestion] discover "${query}" → ${refs.length} channels`);
+    for (const ref of refs) {
+      await queue.add("ingest", { platform, externalId: ref.externalId, handle: ref.handle }, { removeOnComplete: true, attempts: 2 });
     }
-    case "normalize": {
-      // TODO(ingestion): map provider-specific fields → Qulture's canonical
-      // creator/account/content/audience shapes.
-      await queue.add("score", { ...data, stage: "score", normalized: { placeholder: true } });
-      break;
+    return;
+  }
+
+  if (job.name === "ingest") {
+    const { platform, externalId, handle } = job.data as IngestData;
+    const bundle = await getConnector(platform).ingestChannel({ externalId: externalId ?? "", handle });
+    if (!bundle) {
+      console.warn(`[ingestion] ingest: channel not found (${externalId ?? handle})`);
+      return;
     }
-    case "score": {
-      // TODO(ingestion): run scoring (fakeFollowerScore, audienceQualityScore,
-      // engagementAnomaly, suspectedPod) from src/lib/scoring on normalized data.
-      await queue.add("embed", { ...data, stage: "embed" });
-      break;
-    }
-    case "embed": {
-      // TODO(ingestion): compute embeddings with src/lib/embeddings.embedCreatorText
-      // (or a real model) for creators/content.
-      await queue.add("upsert", { ...data, stage: "upsert" });
-      break;
-    }
-    case "upsert": {
-      // TODO(ingestion): upsert into Postgres (creators/platform_accounts/
-      // audience_reports/content_items) and write embeddings via raw SQL, exactly
-      // as prisma/seed.ts does. After upsert the MockProvider/IngestionProvider
-      // reads serve the new data with no app changes.
-      console.log(`[ingestion] upsert complete for ${data.accountId ?? data.source ?? ""}`);
-      break;
-    }
+    const creatorId = await upsertCreatorBundle(bundle);
+    console.log(`[ingestion] upserted ${bundle.creator.name} (${bundle.externalId}) → ${creatorId}`);
+    return;
   }
 }
 
 export function startIngestionWorker(): Worker {
-  const worker = new Worker<PipelinePayload>(QUEUE_NAMES.ingestion, handle, {
+  const worker = new Worker<PipelineData>(QUEUE_NAMES.ingestion, handle, {
     connection: redisConnection(),
-    concurrency: 5,
+    concurrency: 3,
   });
   worker.on("completed", (job) => console.log(`[ingestion] ${job.name} ${job.id} done`));
   worker.on("failed", (job, err) => console.error(`[ingestion] ${job?.name} failed:`, err.message));

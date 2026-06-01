@@ -47,10 +47,23 @@ export class IngestionProvider implements DataProvider {
   }
 
   async refreshAccount(accountId: string): Promise<{ ok: boolean; message: string }> {
-    // Enqueue the ingestion pipeline for this account. Lazy import keeps BullMQ
-    // out of the request path unless this provider is active.
+    // Re-ingest this account by its platform-native id. Lazy imports keep BullMQ
+    // and Prisma out of the request path unless this provider is active.
+    const { prisma } = await import("@/lib/db");
+    const account = await prisma.platformAccount.findUnique({
+      where: { id: accountId },
+      select: { platform: true, externalId: true },
+    });
+    if (!account) return { ok: false, message: "Account not found" };
+    if (!account.externalId) {
+      return { ok: false, message: "This account has no external id to re-ingest (e.g. seeded/mock data)." };
+    }
     const { ingestionQueue } = await import("@/lib/queue");
-    await ingestionQueue.add("fetch", { accountId, stage: "fetch" }, { removeOnComplete: true });
-    return { ok: true, message: "Queued ingestion pipeline (fetch → normalize → score → embed → upsert)." };
+    await ingestionQueue.add(
+      "ingest",
+      { platform: account.platform, externalId: account.externalId },
+      { removeOnComplete: true, attempts: 2 }
+    );
+    return { ok: true, message: `Queued re-ingestion for ${account.platform}.` };
   }
 }

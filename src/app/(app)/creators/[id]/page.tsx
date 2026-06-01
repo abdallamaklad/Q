@@ -75,6 +75,9 @@ export default async function CreatorProfile({ params }: { params: Promise<{ id:
             <p className="text-sm text-muted-foreground">@{creator.handle} · {creator.location ?? "—"}</p>
             <div className="mt-2 flex flex-wrap items-center gap-1">
               {creator.accounts.map((a) => <PlatformBadge key={a.platform} platform={a.platform} />)}
+              {creator.source && creator.source !== "mock" && (
+                <Badge variant="success" className="capitalize">Live · {creator.source}</Badge>
+              )}
               {creator.categoryTags.map((t) => <Badge key={t} variant="secondary">{t}</Badge>)}
               {creator.languages.map((l) => <Badge key={l} variant="outline">{l}</Badge>)}
             </div>
@@ -132,7 +135,13 @@ export default async function CreatorProfile({ params }: { params: Promise<{ id:
           </div>
         </TabsContent>
 
-        <TabsContent value="audience">
+        <TabsContent value="audience" className="space-y-3">
+          {report?.estimated && (
+            <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-600 dark:text-amber-300">
+              <Badge variant="warning">Estimated</Badge>
+              Audience demographics are estimated — public APIs don&apos;t expose them. Engagement and fraud/quality scores are from real data.
+            </div>
+          )}
           {report ? (
             <AudienceCharts
               gender={report.genderDistribution}

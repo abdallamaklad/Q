@@ -140,6 +140,8 @@ model Creator {
   followerTotal  Int      @default(0)
   engagementRate Float    @default(0) // percent, e.g. 4.2
   growthRate     Float    @default(0) // percent month-over-month
+  // Provenance: "mock" | "youtube" | … (where this creator's data came from)
+  source         String?
   // Differentiator flags (roadmap):
   aiGeneratedScore Float  @default(0) // 0-1 likelihood the persona is AI-generated
   verified         Boolean @default(false)
@@ -167,6 +169,7 @@ model PlatformAccount {
   creatorId      String
   platform       Platform
   handle         String
+  externalId     String? // platform-native id (e.g. YouTube channelId) for idempotent re-ingest
   url            String?
   followers      Int      @default(0)
   engagementRate Float    @default(0)
@@ -181,6 +184,7 @@ model PlatformAccount {
   content        ContentItem[]
 
   @@unique([creatorId, platform])
+  @@unique([platform, externalId])
   @@index([platform])
   @@index([followers])
   @@map("platform_accounts")
@@ -195,6 +199,9 @@ model AudienceReport {
   interestDistribution Json    @default("{}") // { fitness: 0.3, ... }
   fakeFollowerScore   Float    @default(0) // 0-100 (% estimated fake)
   audienceQualityScore Float   @default(0) // 0-100 (higher = better)
+  // True when demographics are heuristically estimated (e.g. ingested creators
+  // where the public API doesn't expose real audience data).
+  estimated           Boolean  @default(false)
   // Fraud signals
   engagementAnomaly   Boolean  @default(false)
   suspectedPod        Boolean  @default(false)

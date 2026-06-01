@@ -39,6 +39,7 @@ interface CreatorRow {
   growthRate: number;
   verified: boolean;
   aiGeneratedScore: number;
+  source: string | null;
   platforms: string[];
   score: number | null;
 }
@@ -59,6 +60,7 @@ function rowToSummary(r: CreatorRow): CreatorSummary {
     growthRate: r.growthRate,
     verified: r.verified,
     aiGeneratedScore: r.aiGeneratedScore,
+    source: r.source,
     platforms: (r.platforms ?? []).filter(Boolean) as CreatorSummary["platforms"],
     score: r.score == null ? undefined : Math.max(0, Math.round(r.score * 1000) / 1000),
   };
@@ -178,7 +180,7 @@ export class MockProvider implements DataProvider {
     const rows = await prisma.$queryRaw<CreatorRow[]>`
       SELECT c.id, c.name, c.handle, c."avatarUrl", c.bio, c."categoryTags",
              c.location, c.country, c.languages, c."followerTotal", c."engagementRate",
-             c."growthRate", c.verified, c."aiGeneratedScore",
+             c."growthRate", c.verified, c."aiGeneratedScore", c.source,
              ARRAY(SELECT DISTINCT pa."platform"::text FROM "platform_accounts" pa WHERE pa."creatorId" = c.id) AS platforms,
              ${scoreSql} AS score
       FROM "creators" c
@@ -231,6 +233,7 @@ export class MockProvider implements DataProvider {
       growthRate: c.growthRate,
       verified: c.verified,
       aiGeneratedScore: c.aiGeneratedScore,
+      source: c.source,
       platforms: c.accounts.map((a) => a.platform),
       accounts,
     };
@@ -250,6 +253,7 @@ export class MockProvider implements DataProvider {
       audienceQualityScore: r.audienceQualityScore,
       engagementAnomaly: r.engagementAnomaly,
       suspectedPod: r.suspectedPod,
+      estimated: r.estimated,
     };
   }
 
@@ -295,7 +299,7 @@ export class MockProvider implements DataProvider {
       )
       SELECT c.id, c.name, c.handle, c."avatarUrl", c.bio, c."categoryTags",
              c.location, c.country, c.languages, c."followerTotal", c."engagementRate",
-             c."growthRate", c.verified, c."aiGeneratedScore",
+             c."growthRate", c.verified, c."aiGeneratedScore", c.source,
              ARRAY(SELECT DISTINCT pa."platform"::text FROM "platform_accounts" pa WHERE pa."creatorId" = c.id) AS platforms,
              (1 - (c."embedding" <=> centroid.e)) AS score
       FROM "creators" c, centroid

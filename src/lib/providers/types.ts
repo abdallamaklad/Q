@@ -38,6 +38,8 @@ export interface CreatorSummary {
   verified: boolean;
   aiGeneratedScore: number;
   platforms: Platform[];
+  /** Provenance: "mock" | "youtube" | … (null for legacy seed rows). */
+  source?: string | null;
   /** Search relevance score 0..1 when returned from searchCreators. */
   score?: number;
 }
@@ -57,6 +59,8 @@ export interface AudienceReportDTO {
   audienceQualityScore: number;
   engagementAnomaly: boolean;
   suspectedPod: boolean;
+  /** True when demographics are heuristically estimated (e.g. ingested creators). */
+  estimated: boolean;
 }
 
 export interface ContentItemDTO {

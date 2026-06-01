@@ -83,3 +83,12 @@ Each stage is a job that enqueues the next (`src/workers/ingestion.worker.ts`), 
 ## Background jobs (BullMQ)
 
 `src/workers/index.ts` runs two workers against Redis: the **ingestion** pipeline and an **analytics** worker (`refresh-account`, `recompute-predictions`). Queues/connections are defined in `src/lib/queue.ts`.
+
+## Real data ingestion (`src/lib/ingestion`)
+
+Live creators flow into the **same Postgres tables** the app already reads, so no UI/search changes are needed. A platform-agnostic **`SourceConnector`** seam (`types.ts`, `getConnector()` in `index.ts`) lets each platform plug in:
+
+- **YouTube** (`youtube.ts`) — the first live connector, using YouTube Data API v3 (`YOUTUBE_API_KEY`). `discover()` (keyword → channels) and `ingestChannel()` (channel + recent videos → metrics). Quota-aware via the token bucket in `providers/rate-limiter.ts`.
+- **Instagram / TikTok** — `getConnector()` throws `NotImplementedError`; wire a licensed aggregator or CSV importer behind the same interface (official APIs need app review + offer no discovery).
+
+`normalize.ts` maps raw API data → the canonical bundle (same shape as the seed's `GeneratedCreator`), computing **real** engagement + fraud/quality scores (`src/lib/scoring`) and a **heuristically estimated** audience (flagged `estimated`, since public APIs don't expose demographics). `upsert.ts` (`upsertCreatorBundle`) idempotently writes creator/account/audience/content + pgvector embeddings, deduped on `(platform, externalId)`. The BullMQ worker runs `discover` → per-channel `ingest`; trigger via the admin **`/ingest`** page or `POST /api/ingest`. Creators carry a `source` (`mock` | `youtube`) surfaced as a "Live" badge.

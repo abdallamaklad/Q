@@ -44,10 +44,13 @@ export function CreatorCard({
           </div>
         </Link>
 
-        <div className="mt-3 flex flex-wrap gap-1">
+        <div className="mt-3 flex flex-wrap items-center gap-1">
           {creator.platforms.map((p) => (
             <PlatformBadge key={p} platform={p} />
           ))}
+          {creator.source && creator.source !== "mock" && (
+            <Badge variant="success" className="text-[10px]">Live</Badge>
+          )}
         </div>
 
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">

@@ -1,0 +1,22 @@
+# Caddy auto-provisions and renews TLS certificates from Let's Encrypt for the
+# domain set in $DOMAIN, and reverse-proxies to the Next.js web container.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3002
+
+	# Long-lived caching for Next static assets.
+	@static path /_next/static/* /icon.svg
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	header {
+		# Sensible security headers.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+	}
+}

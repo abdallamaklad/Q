@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: qulture-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: qulture
+      POSTGRES_PASSWORD: qulture
+      POSTGRES_DB: qulture
+    ports:
+      - "5432:5432"
+    volumes:
+      - qulture_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qulture -d qulture"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: qulture-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - qulture_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  qulture_pg:
+  qulture_redis:

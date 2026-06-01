@@ -1,0 +1,102 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Qulture production stack for a single VPS (e.g. Hostinger VPS) with Docker.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+#
+# Services: postgres (pgvector) · redis · migrate (one-shot) · web · worker · caddy
+# Caddy terminates TLS automatically via Let's Encrypt for $DOMAIN.
+#
+# To use EXTERNAL managed Postgres/Redis (e.g. Neon + Upstash): set DATABASE_URL
+# and REDIS_URL to the external URLs in .env and delete the postgres/redis
+# services + their depends_on entries.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-qulture}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-qulture}
+    volumes:
+      - qulture_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-qulture} -d ${POSTGRES_DB:-qulture}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - qulture_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # One-shot: apply migrations (and optionally seed) before web/worker start.
+  migrate:
+    build: .
+    command: ["sh", "-c", "npx prisma migrate deploy && if [ \"$SEED_ON_DEPLOY\" = \"true\" ]; then npx prisma db seed; fi"]
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["npm", "run", "worker"]
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  qulture_pg:
+  qulture_redis:
+  caddy_data:
+  caddy_config:

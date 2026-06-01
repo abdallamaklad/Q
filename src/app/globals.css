@@ -1,0 +1,145 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Qulture brand identity — dark-first, Qulture Violet.
+   Palette: Black #07070F · Violet #9B5CFF · Heat #FF46CC · Cyan #22D4EE
+            Gold #FFBA45 · White #EEEEFF · Muted #6A6A92
+   Type:    Syne (display) · Figtree (body) · JetBrains Mono (data)
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  --background: #07070f;
+  --foreground: #eeeeff;
+  --card: #0d0d1b;
+  --card-foreground: #eeeeff;
+  --popover: #131326;
+  --popover-foreground: #eeeeff;
+  --primary: #9b5cff;
+  --primary-foreground: #0d0d1b;
+  --secondary: #131326;
+  --secondary-foreground: #eeeeff;
+  --muted: #131326;
+  --muted-foreground: #6a6a92;
+  --accent: #1a1730;
+  --accent-foreground: #eeeeff;
+  --destructive: #ff5050;
+  --destructive-foreground: #ffffff;
+  --border: rgba(155, 92, 255, 0.16);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #9b5cff;
+  /* Brand data-viz palette: Violet · Cyan · Heat · Gold · Green */
+  --chart-1: #9b5cff;
+  --chart-2: #22d4ee;
+  --chart-3: #ff46cc;
+  --chart-4: #ffba45;
+  --chart-5: #4ee89e;
+  --radius: 0.75rem;
+
+  /* Brand accent tokens (used directly in some brand surfaces) */
+  --brand: #9b5cff;
+  --brand-heat: #ff46cc;
+  --brand-data: #22d4ee;
+}
+
+/* Dark class mirrors :root so the app is dark-first regardless of class. */
+.dark {
+  --background: #07070f;
+  --foreground: #eeeeff;
+  --card: #0d0d1b;
+  --card-foreground: #eeeeff;
+  --popover: #131326;
+  --popover-foreground: #eeeeff;
+  --primary: #9b5cff;
+  --primary-foreground: #0d0d1b;
+  --secondary: #131326;
+  --secondary-foreground: #eeeeff;
+  --muted: #131326;
+  --muted-foreground: #6a6a92;
+  --accent: #1a1730;
+  --accent-foreground: #eeeeff;
+  --destructive: #ff5050;
+  --destructive-foreground: #ffffff;
+  --border: rgba(155, 92, 255, 0.16);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #9b5cff;
+  --chart-1: #9b5cff;
+  --chart-2: #22d4ee;
+  --chart-3: #ff46cc;
+  --chart-4: #ffba45;
+  --chart-5: #4ee89e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-heat: var(--brand-heat);
+  --color-brand-data: var(--brand-data);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Headings and page titles use the Syne display face. */
+h1, h2, h3, .font-display {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* Monospace utility tied to the brand mono face. */
+.font-mono, code, kbd, pre {
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+/* Recharts: legible axis/label text + grid + tooltip on the dark canvas. */
+.recharts-text { fill: var(--muted-foreground); }
+.recharts-cartesian-grid line { stroke: rgba(255, 255, 255, 0.06); }
+.recharts-default-tooltip {
+  background-color: #131326 !important;
+  border: 1px solid rgba(155, 92, 255, 0.25) !important;
+  border-radius: 8px !important;
+  color: #eeeeff;
+}
+.recharts-tooltip-item { color: #eeeeff !important; }
+
+/* Subtle brand glow utility for hero/brand surfaces. */
+.brand-glow { box-shadow: 0 0 40px -12px rgba(155, 92, 255, 0.45); }

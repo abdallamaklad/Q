@@ -1,0 +1,539 @@
+// Qulture — Prisma schema (PostgreSQL + pgvector)
+//
+// Embeddings are stored as pgvector `vector(384)` columns via Unsupported(),
+// because Prisma Client cannot yet read/write vector types directly. We write
+// and query them with raw SQL (see src/lib/embeddings + MockProvider). The
+// `vector` extension is enabled by the initial migration / setup script.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth, organizations & RBAC
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  admin
+  member
+  viewer
+}
+
+model Org {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  memberships Membership[]
+  brands      Brand[]
+  campaigns   Campaign[]
+  shortlists  Shortlist[]
+
+  @@map("orgs")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  createdAt     DateTime  @default(now())
+
+  memberships        Membership[]
+  accounts           Account[]
+  sessions           Session[]
+  negotiationChanges NegotiationHistory[]
+
+  @@map("users")
+}
+
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  orgId  String
+  role   Role   @default(member)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+  @@map("memberships")
+}
+
+// NextAuth adapter models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Creators & platform data
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Platform {
+  instagram
+  tiktok
+  youtube
+  snapchat
+  twitch
+  facebook
+  x
+  pinterest
+}
+
+model Creator {
+  id             String   @id @default(cuid())
+  name           String
+  handle         String   @unique // canonical handle
+  avatarUrl      String?
+  bio            String?
+  categoryTags   String[]
+  location       String? // "Berlin, Germany"
+  country        String? // ISO-ish country name for filtering
+  languages      String[]
+  followerTotal  Int      @default(0)
+  engagementRate Float    @default(0) // percent, e.g. 4.2
+  growthRate     Float    @default(0) // percent month-over-month
+  // Differentiator flags (roadmap):
+  aiGeneratedScore Float  @default(0) // 0-1 likelihood the persona is AI-generated
+  verified         Boolean @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Embedding stored separately as vector(384). Managed via raw SQL.
+  embedding      Unsupported("vector(384)")?
+
+  accounts       PlatformAccount[]
+  content        ContentItem[]
+  campaignLinks  CampaignCreator[]
+  shortlistItems ShortlistItem[]
+  claims         CreatorClaim[]
+  predictions    PredictivePerformance[]
+
+  @@index([country])
+  @@index([followerTotal])
+  @@index([engagementRate])
+  @@map("creators")
+}
+
+model PlatformAccount {
+  id             String   @id @default(cuid())
+  creatorId      String
+  platform       Platform
+  handle         String
+  url            String?
+  followers      Int      @default(0)
+  engagementRate Float    @default(0)
+  growthRate     Float    @default(0)
+  postsCount     Int      @default(0)
+  metrics        Json     @default("{}") // platform-specific metric blob
+  history        Json     @default("[]") // [{ date, followers, engagementRate }]
+  lastRefreshed  DateTime @default(now())
+
+  creator        Creator         @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  audienceReport AudienceReport?
+  content        ContentItem[]
+
+  @@unique([creatorId, platform])
+  @@index([platform])
+  @@index([followers])
+  @@map("platform_accounts")
+}
+
+model AudienceReport {
+  id                  String   @id @default(cuid())
+  accountId           String   @unique
+  ageDistribution     Json     @default("{}") // { "18-24": 0.3, ... }
+  genderDistribution  Json     @default("{}") // { male: 0.4, female: 0.55, other: 0.05 }
+  geoDistribution     Json     @default("{}") // { Germany: 0.4, ... }
+  interestDistribution Json    @default("{}") // { fitness: 0.3, ... }
+  fakeFollowerScore   Float    @default(0) // 0-100 (% estimated fake)
+  audienceQualityScore Float   @default(0) // 0-100 (higher = better)
+  // Fraud signals
+  engagementAnomaly   Boolean  @default(false)
+  suspectedPod        Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  account PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("audience_reports")
+}
+
+enum ContentType {
+  image
+  video
+  reel
+  short
+  story
+  stream
+  post
+}
+
+model ContentItem {
+  id          String      @id @default(cuid())
+  creatorId   String
+  accountId   String
+  platform    Platform
+  type        ContentType
+  caption     String?
+  transcript  String?
+  hashtags    String[]
+  mentions    String[]
+  thumbnailUrl String?
+  metrics     Json        @default("{}") // { likes, comments, views, shares }
+  sentiment   Float       @default(0) // -1..1 avg comment sentiment
+  deepfakeScore Float     @default(0) // 0-1 roadmap detection hook
+  postedAt    DateTime
+
+  embedding   Unsupported("vector(384)")?
+
+  creator Creator         @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  account PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([creatorId])
+  @@index([postedAt])
+  @@map("content_items")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Brands, campaigns, shortlists, outreach, contracts, payments, tracking
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Brand {
+  id           String   @id @default(cuid())
+  orgId        String
+  name         String
+  website      String?
+  categoryTags String[]
+  description  String?
+  createdAt    DateTime @default(now())
+
+  embedding Unsupported("vector(384)")?
+
+  org       Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+
+  @@index([orgId])
+  @@map("brands")
+}
+
+enum CampaignStatus {
+  draft
+  active
+  paused
+  completed
+  archived
+}
+
+model Campaign {
+  id        String         @id @default(cuid())
+  orgId     String
+  brandId   String?
+  name      String
+  brief     String?
+  goal      String?
+  budget    Float          @default(0)
+  status    CampaignStatus @default(draft)
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  org             Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  brand           Brand?            @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  creators        CampaignCreator[]
+  conversionEvents ConversionEvent[]
+
+  @@index([orgId])
+  @@map("campaigns")
+}
+
+enum CampaignStage {
+  contacted
+  negotiating
+  booked
+  live
+  completed
+}
+
+model CampaignCreator {
+  id           String        @id @default(cuid())
+  campaignId   String
+  creatorId    String
+  stage        CampaignStage @default(contacted)
+  rate         Float         @default(0) // agreed/proposed fee
+  deliverables String? // e.g. "1 reel + 3 stories"
+  notes        String?
+  createdAt    DateTime      @default(now())
+
+  campaign         Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creator          Creator              @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  outreachThreads  OutreachThread[]
+  contracts        Contract[]
+  payments         Payment[]
+  posts            PostPerformance[]
+  conversionEvents ConversionEvent[]
+  negotiationHistory NegotiationHistory[]
+
+  @@unique([campaignId, creatorId])
+  @@index([campaignId])
+  @@map("campaign_creators")
+}
+
+// Append-only history of negotiation terms (rate + deliverables) per creator.
+// Each save records who changed it so a user can review their own history.
+model NegotiationHistory {
+  id                String   @id @default(cuid())
+  campaignCreatorId String
+  rate              Float
+  deliverables      String?
+  changedById       String
+  createdAt         DateTime @default(now())
+
+  campaignCreator CampaignCreator @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+  changedBy       User            @relation(fields: [changedById], references: [id], onDelete: Cascade)
+
+  @@index([campaignCreatorId])
+  @@index([changedById])
+  @@map("negotiation_history")
+}
+
+model Shortlist {
+  id        String   @id @default(cuid())
+  orgId     String
+  name      String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  org   Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  items ShortlistItem[]
+
+  @@index([orgId])
+  @@map("shortlists")
+}
+
+model ShortlistItem {
+  id          String   @id @default(cuid())
+  shortlistId String
+  creatorId   String
+  tags        String[]
+  note        String?
+  addedAt     DateTime @default(now())
+
+  shortlist Shortlist @relation(fields: [shortlistId], references: [id], onDelete: Cascade)
+  creator   Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@unique([shortlistId, creatorId])
+  @@map("shortlist_items")
+}
+
+enum MessageRole {
+  outbound
+  inbound
+}
+
+enum MessageStatus {
+  draft
+  approved
+  sent
+}
+
+model OutreachThread {
+  id                String   @id @default(cuid())
+  campaignCreatorId String
+  subject           String?
+  createdAt         DateTime @default(now())
+
+  campaignCreator CampaignCreator   @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+  messages        OutreachMessage[]
+
+  @@index([campaignCreatorId])
+  @@map("outreach_threads")
+}
+
+model OutreachMessage {
+  id           String        @id @default(cuid())
+  threadId     String
+  role         MessageRole   @default(outbound)
+  status       MessageStatus @default(draft) // never auto-send: starts as draft
+  body         String
+  sequenceStep Int           @default(0) // 0 = first message, 1..n = follow-ups
+  generatedBy  String        @default("mock-llm")
+  sentAt       DateTime?
+  createdAt    DateTime      @default(now())
+
+  thread OutreachThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+  @@map("outreach_messages")
+}
+
+model Contract {
+  id                String   @id @default(cuid())
+  campaignCreatorId String
+  title             String
+  terms             String?
+  amount            Float    @default(0)
+  signed            Boolean  @default(false)
+  signedAt          DateTime?
+  createdAt         DateTime @default(now())
+
+  campaignCreator CampaignCreator @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+
+  @@index([campaignCreatorId])
+  @@map("contracts")
+}
+
+enum PaymentStatus {
+  pending
+  approved
+  paid
+  failed
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  campaignCreatorId String
+  amount            Float
+  currency          String        @default("USD")
+  status            PaymentStatus @default(pending) // requires explicit approval to advance
+  externalRef       String?
+  createdAt         DateTime      @default(now())
+
+  campaignCreator CampaignCreator @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+
+  @@index([campaignCreatorId])
+  @@map("payments")
+}
+
+model PostPerformance {
+  id                String   @id @default(cuid())
+  campaignCreatorId String
+  platform          Platform
+  url               String?
+  reach             Int      @default(0)
+  impressions       Int      @default(0)
+  likes             Int      @default(0)
+  comments          Int      @default(0)
+  shares            Int      @default(0)
+  clicks            Int      @default(0)
+  postedAt          DateTime @default(now())
+
+  campaignCreator CampaignCreator @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+
+  @@index([campaignCreatorId])
+  @@map("post_performance")
+}
+
+enum ConversionSource {
+  shopify
+  stripe
+  ga4
+  manual
+}
+
+model ConversionEvent {
+  id                String           @id @default(cuid())
+  campaignId        String
+  campaignCreatorId String?
+  source            ConversionSource @default(manual)
+  type              String // "purchase" | "signup" | "lead" | ...
+  value             Float            @default(0) // revenue
+  externalId        String?
+  occurredAt        DateTime         @default(now())
+
+  campaign        Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignCreator CampaignCreator? @relation(fields: [campaignCreatorId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId])
+  @@index([campaignCreatorId])
+  @@map("conversion_events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Differentiators (scaffolded / roadmap)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PredictivePerformance {
+  id              String   @id @default(cuid())
+  creatorId       String
+  expectedReach   Int      @default(0)
+  expectedEngagements Int  @default(0)
+  expectedCpm     Float    @default(0)
+  confidence      Float    @default(0) // 0-1
+  modelVersion    String   @default("heuristic-v1")
+  computedAt      DateTime @default(now())
+
+  creator Creator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@map("predictive_performance")
+}
+
+enum ClaimStatus {
+  pending
+  verified
+  rejected
+}
+
+model CreatorClaim {
+  id              String      @id @default(cuid())
+  creatorId       String
+  claimantEmail   String
+  status          ClaimStatus @default(pending)
+  verificationCode String
+  submittedStats  Json        @default("{}") // self-reported analytics
+  createdAt       DateTime    @default(now())
+
+  creator Creator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@map("creator_claims")
+}

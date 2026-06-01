@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env*.local
+npm-debug.log*
+coverage
+*.tsbuildinfo
+.DS_Store
+deploy/caddy_data
+deploy/caddy_config
+README.md
+ARCHITECTURE.md

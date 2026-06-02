@@ -1,28 +1,32 @@
 import { Platform } from "@prisma/client";
-import { getAggregator } from "./aggregator";
-import { normalizeAggregator } from "./normalize";
+import { getLLM } from "@/lib/llm";
 import type { ChannelRef, IngestedBundle, SourceConnector } from "./types";
 
 /**
- * Instagram connector via a licensed data aggregator (vendor-agnostic — see
- * src/lib/ingestion/aggregator). Instagram has no free public discovery API, so
- * discovery + metrics come from the configured vendor (AGGREGATOR_VENDOR /
- * AGGREGATOR_API_KEY). Supports keyword discovery AND handle enrichment, and
- * uses real audience demographics when the vendor provides them.
+ * Instagram connector.
+ *
+ * Phase 1 (now): AI-assisted DISCOVERY — the LLM suggests candidate handles for
+ * a keyword/niche (no scraping, no aggregator cost). Reuses src/lib/llm.
+ *
+ * Phase 2 (next): ENRICHMENT via the Instagram Graph API (Business Discovery)
+ * to turn each candidate handle into a real profile (followers, recent posts,
+ * engagement). That needs a Meta app + IG Business account + token; until it's
+ * wired, ingestChannel throws a clear pending error rather than fabricating data.
+ *
+ * (A vendor-aggregator alternative remains available in src/lib/ingestion/aggregator.)
  */
 export class InstagramConnector implements SourceConnector {
   readonly platform = Platform.instagram;
 
   async discover(query: string, limit: number): Promise<ChannelRef[]> {
-    const hits = await getAggregator().search(query, this.platform, limit);
-    return hits.map((h) => ({ externalId: h.externalId, handle: h.handle }));
+    const found = await getLLM().discoverCreators({ keyword: query, platform: "instagram", limit });
+    return found.map((c) => ({ externalId: "", handle: c.handle }));
   }
 
-  async ingestChannel(ref: ChannelRef): Promise<IngestedBundle | null> {
-    const idOrHandle = ref.handle || ref.externalId;
-    if (!idOrHandle) return null;
-    const creator = await getAggregator().report(idOrHandle, this.platform);
-    if (!creator) return null;
-    return normalizeAggregator(creator);
+  async ingestChannel(_ref: ChannelRef): Promise<IngestedBundle | null> {
+    throw new Error(
+      "Instagram enrichment is not wired yet (Graph API pending). AI discovery returns candidate handles; " +
+        "the Graph API Business Discovery step (next phase) turns them into real profiles."
+    );
   }
 }

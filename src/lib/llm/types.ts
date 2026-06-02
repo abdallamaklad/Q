@@ -20,6 +20,17 @@ export interface ProfileSummaryInput {
   audienceQualityScore: number;
 }
 
+export interface DiscoverInput {
+  keyword: string;
+  platform: string; // "instagram" | "youtube" | …
+  limit: number;
+}
+
+export interface DiscoveredCreator {
+  handle: string; // platform handle without a leading @
+  name?: string;
+}
+
 export interface OutreachInput {
   creatorName: string;
   creatorCategories: string[];
@@ -42,4 +53,10 @@ export interface LLMProvider {
   summarizeProfile(input: ProfileSummaryInput): Promise<string>;
   draftOutreach(input: OutreachInput): Promise<string>;
   draftFollowups(input: OutreachInput, count: number): Promise<string[]>;
+  /**
+   * AI-assisted discovery: suggest real creator handles for a keyword/niche.
+   * Candidates only — they must be validated/enriched against the platform API
+   * (some may be stale or wrong). The mock returns deterministic placeholders.
+   */
+  discoverCreators(input: DiscoverInput): Promise<DiscoveredCreator[]>;
 }

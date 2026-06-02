@@ -31,10 +31,12 @@ export async function POST(req: Request) {
   if (platform === "youtube" && !process.env.YOUTUBE_API_KEY) {
     return NextResponse.json({ error: "YOUTUBE_API_KEY is not configured on the server." }, { status: 400 });
   }
-  if (platform === "instagram" && !process.env.AGGREGATOR_API_KEY) {
-    return NextResponse.json({ error: "AGGREGATOR_API_KEY is not configured (Instagram needs a data-aggregator key)." }, { status: 400 });
+  if (platform === "instagram") {
+    return NextResponse.json(
+      { error: "Instagram full ingestion needs the Graph API (next phase). Use AI Discover to preview candidate handles for now." },
+      { status: 400 }
+    );
   }
-  // Instagram handle entries don't use channel-id semantics; pass them as handles.
 
   try {
     const { ingestionQueue } = await import("@/lib/queue");

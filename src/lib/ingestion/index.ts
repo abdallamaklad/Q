@@ -18,10 +18,10 @@ export function getConnector(platform: Platform): SourceConnector {
       if (!key) throw new Error("YOUTUBE_API_KEY is not configured.");
       return new YouTubeConnector(key);
     }
-    case Platform.instagram: {
-      if (!process.env.AGGREGATOR_API_KEY) throw new Error("AGGREGATOR_API_KEY is not configured (Instagram via aggregator).");
+    case Platform.instagram:
+      // Discovery uses the LLM (no key needed); enrichment via Graph API is the
+      // next phase (ingestChannel throws clearly until then).
       return new InstagramConnector();
-    }
     default:
       throw new NotImplementedError("ingestion", `connector:${platform}`);
   }

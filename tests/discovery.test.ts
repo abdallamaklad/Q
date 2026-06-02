@@ -1,8 +1,29 @@
 import { describe, it, expect } from "vitest";
 import { MockLLM } from "@/lib/llm/mock";
 import { InstagramConnector } from "@/lib/ingestion/instagram";
+import { parseDiscovered } from "@/lib/llm/anthropic";
 
 const llm = new MockLLM();
+
+describe("parseDiscovered (tolerant LLM JSON parse)", () => {
+  it("parses clean JSON", () => {
+    const out = parseDiscovered('[{"handle":"@nimai_delgado","name":"Nimai"},{"handle":"torrewashington"}]', 10);
+    expect(out.map((c) => c.handle)).toEqual(["nimai_delgado", "torrewashington"]); // @ stripped
+  });
+
+  it("salvages valid entries when one is malformed (unescaped quote)", () => {
+    // The exact kind of glitch the model produced live.
+    const text = '[\n{"handle":"nimai_delgado","name":"Nimai"},\n{"handle":"theveganp"sychologist","name":"x"},\n{"handle":"karaharms","name":"Kara"}\n]';
+    const out = parseDiscovered(text, 10).map((c) => c.handle);
+    expect(out).toContain("nimai_delgado");
+    expect(out).toContain("karaharms"); // not lost despite the malformed middle entry
+  });
+
+  it("dedupes and caps at limit", () => {
+    const out = parseDiscovered('[{"handle":"a"},{"handle":"a"},{"handle":"b"},{"handle":"c"}]', 2);
+    expect(out).toHaveLength(2);
+  });
+});
 
 describe("MockLLM.discoverCreators", () => {
   it("returns deterministic candidate handles without a leading @", async () => {

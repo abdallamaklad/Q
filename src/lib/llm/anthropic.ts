@@ -120,16 +120,41 @@ export class AnthropicLLM implements LLMProvider {
         ],
       });
       const block = msg.content.find((b) => b.type === "text");
-      const text = block && "text" in block ? block.text : "[]";
-      const arr = JSON.parse(text.slice(text.indexOf("["), text.lastIndexOf("]") + 1));
-      if (!Array.isArray(arr)) return this.fallback.discoverCreators(input);
-      const seen = new Set<string>();
-      return arr
-        .map((x: { handle?: string; name?: string }) => ({ handle: String(x?.handle ?? "").replace(/^@/, "").trim(), name: x?.name }))
-        .filter((c) => c.handle && !seen.has(c.handle.toLowerCase()) && seen.add(c.handle.toLowerCase()))
-        .slice(0, input.limit);
+      const text = block && "text" in block ? block.text : "";
+      const creators = parseDiscovered(text, input.limit);
+      return creators.length ? creators : this.fallback.discoverCreators(input);
     } catch {
       return this.fallback.discoverCreators(input);
     }
   }
+}
+
+/**
+ * Tolerant parse of an LLM discovery response. Tries strict JSON first; if that
+ * fails (e.g. a single entry has an unescaped quote), falls back to a regex that
+ * salvages the valid {handle,name} pairs — so one malformed item can't nuke the
+ * whole list. Dedupes, strips '@', and caps at `limit`.
+ */
+export function parseDiscovered(text: string, limit: number): DiscoveredCreator[] {
+  const slice = text.slice(text.indexOf("["), text.lastIndexOf("]") + 1);
+  let raw: { handle?: string; name?: string }[] = [];
+  try {
+    const arr = JSON.parse(slice);
+    if (Array.isArray(arr)) raw = arr;
+  } catch {
+    // Regex salvage: pull each "handle":"..." (and optional adjacent "name":"...").
+    for (const m of slice.matchAll(/"handle"\s*:\s*"([^"\\]+)"(?:[^}]*?"name"\s*:\s*"([^"\\]+)")?/g)) {
+      raw.push({ handle: m[1], name: m[2] });
+    }
+  }
+  const seen = new Set<string>();
+  const out: DiscoveredCreator[] = [];
+  for (const x of raw) {
+    const handle = String(x?.handle ?? "").replace(/^@/, "").trim();
+    if (!handle || seen.has(handle.toLowerCase())) continue;
+    seen.add(handle.toLowerCase());
+    out.push({ handle, name: x?.name });
+    if (out.length >= limit) break;
+  }
+  return out;
 }

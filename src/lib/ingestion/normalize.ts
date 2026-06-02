@@ -52,7 +52,11 @@ const COUNTRY_LANG: Record<string, string[]> = {
 
 function deriveCategories(text: string): string[] {
   const lc = text.toLowerCase();
-  const hits = CATEGORIES.filter((c) => lc.includes(c));
+  // Whole-word match so "art" doesn't tag "artist"/"smart"/"part", etc.
+  const hits = CATEGORIES.filter((c) => {
+    const escaped = c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`\\b${escaped}\\b`).test(lc);
+  });
   return hits.length ? hits.slice(0, 3) : ["lifestyle"];
 }
 

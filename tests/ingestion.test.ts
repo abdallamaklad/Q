@@ -56,6 +56,14 @@ describe("normalizeYouTube", () => {
     expect(b.creator.engagementRate).toBe(0);
     expect(b.creator.accounts[0].content).toHaveLength(0);
   });
+
+  it("derives categories by whole word, not substring", () => {
+    const ch = { ...channel, description: "a smart artist who started a part-time channel about technology" };
+    const cats = normalizeYouTube(ch, []).creator.categoryTags;
+    expect(cats).not.toContain("art"); // must not match artist/smart/started/part
+    const real = { ...channel, title: "Tech Reviews", description: "honest tech and gaming reviews" };
+    expect(normalizeYouTube(real, []).creator.categoryTags).toEqual(expect.arrayContaining(["tech", "gaming"]));
+  });
 });
 
 describe("sentiment", () => {

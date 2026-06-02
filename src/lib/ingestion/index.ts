@@ -1,6 +1,7 @@
 import { Platform } from "@prisma/client";
 import { NotImplementedError } from "@/lib/providers/types";
 import { YouTubeConnector } from "./youtube";
+import { InstagramConnector } from "./instagram";
 import type { SourceConnector } from "./types";
 
 /**
@@ -16,6 +17,10 @@ export function getConnector(platform: Platform): SourceConnector {
       const key = process.env.YOUTUBE_API_KEY;
       if (!key) throw new Error("YOUTUBE_API_KEY is not configured.");
       return new YouTubeConnector(key);
+    }
+    case Platform.instagram: {
+      if (!process.env.AGGREGATOR_API_KEY) throw new Error("AGGREGATOR_API_KEY is not configured (Instagram via aggregator).");
+      return new InstagramConnector();
     }
     default:
       throw new NotImplementedError("ingestion", `connector:${platform}`);

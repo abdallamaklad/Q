@@ -11,6 +11,7 @@ import { makeRng, CATEGORIES } from "@/lib/providers/mock-data";
 import { averageSentiment } from "./sentiment";
 import type { GeneratedCreator, GeneratedContent } from "@/lib/providers/mock-data";
 import type { IngestedBundle } from "./types";
+import type { AggregatorCreator } from "./aggregator/types";
 
 // ── Raw YouTube shapes (subset of YouTube Data API v3 responses) ─────────────
 export interface RawYouTubeChannel {
@@ -194,4 +195,122 @@ export function normalizeYouTube(channel: RawYouTubeChannel, videos: RawYouTubeV
     audienceEstimated: true,
     creator,
   };
+}
+
+function normDist(d: Distribution): Distribution {
+  const total = Object.values(d).reduce((a, b) => a + b, 0) || 1;
+  const out: Distribution = {};
+  for (const [k, v] of Object.entries(d)) out[k] = Math.round((v / total) * 1000) / 1000;
+  return out;
+}
+
+function contentTypeOf(t?: string): ContentType {
+  switch ((t ?? "").toLowerCase()) {
+    case "reel": return ContentType.reel;
+    case "video": return ContentType.video;
+    case "story": return ContentType.story;
+    default: return ContentType.image;
+  }
+}
+
+/**
+ * Normalize a vendor-aggregator creator (e.g. Instagram via Modash) into the
+ * canonical bundle. Uses REAL audience demographics + fake-follower rate when
+ * the vendor provides them (audienceEstimated=false); otherwise estimates and
+ * flags it. Engagement/quality come from vendor metrics or scoring.
+ */
+export function normalizeAggregator(v: AggregatorCreator): IngestedBundle {
+  const posts = v.recentPosts ?? [];
+  const fromPosts = posts.length
+    ? posts.reduce((a, p) => a + p.likes + p.comments, 0) / posts.length / Math.max(v.followers, 1) * 100
+    : 0;
+  const engagementRate = clamp(v.engagementRate ?? fromPosts, 0, 100);
+
+  const commentsToLikes = posts.length
+    ? posts.reduce((a, p) => a + p.comments / Math.max(p.likes, 1), 0) / posts.length
+    : 0.03;
+  const likeVals = posts.map((p) => p.likes);
+  const likeMean = likeVals.reduce((a, b) => a + b, 0) / Math.max(likeVals.length, 1);
+  const likeVar = likeVals.length
+    ? Math.sqrt(likeVals.reduce((a, b) => a + (b - likeMean) ** 2, 0) / likeVals.length) / Math.max(likeMean, 1)
+    : 0.2;
+
+  const country = v.country && v.country.length === 2 ? COUNTRY_NAMES[v.country] ?? v.country : v.country ?? "United States";
+  const languages = COUNTRY_LANG[country] ?? ["English"];
+  const categoryTags = (v.categories?.length ? v.categories : deriveCategories(`${v.fullName ?? ""} ${v.bio ?? ""}`)).slice(0, 3);
+
+  // Real audience if the vendor supplied demographics; else estimate (flagged).
+  const hasReal = Boolean(v.audience && (v.audience.gender || v.audience.age || v.audience.geo));
+  let audience;
+  let audienceEstimated: boolean;
+  if (hasReal) {
+    const interests = v.audience!.interests ? normDist(v.audience!.interests) : { [categoryTags[0] ?? "lifestyle"]: 1 };
+    const fake = v.fakeFollowerRate != null
+      ? Math.round(v.fakeFollowerRate)
+      : fakeFollowerScore({ followers: v.followers, engagementRate, avgCommentsToLikesRatio: commentsToLikes });
+    audience = {
+      ageDistribution: v.audience!.age ? normDist(v.audience!.age) : {},
+      genderDistribution: v.audience!.gender ? normDist(v.audience!.gender) : {},
+      geoDistribution: v.audience!.geo ? normDist(v.audience!.geo) : {},
+      interestDistribution: interests,
+      fakeFollowerScore: fake,
+      audienceQualityScore: audienceQualityScore({ fakeFollowerScore: fake, engagementRate, followers: v.followers, interestConcentration: concentration(interests) }),
+      engagementAnomaly: engagementAnomaly({ followers: v.followers, engagementRate }),
+      suspectedPod: suspectedPod({ engagementRate, followers: v.followers, avgCommentsToLikesRatio: commentsToLikes, likeVarianceRatio: likeVar }),
+    };
+    audienceEstimated = false;
+  } else {
+    audience = estimateAudience(v.externalId, country, categoryTags, v.followers, engagementRate, commentsToLikes, likeVar);
+    if (v.fakeFollowerRate != null) audience.fakeFollowerScore = Math.round(v.fakeFollowerRate);
+    audienceEstimated = true;
+  }
+
+  const content: GeneratedContent[] = posts.map((p) => ({
+    platform: v.platform,
+    type: contentTypeOf(p.type),
+    caption: p.caption ?? "",
+    transcript: null,
+    hashtags: (p.hashtags ?? []).slice(0, 5).map((h) => h.replace(/^#/, "").toLowerCase()),
+    mentions: (p.mentions ?? []).map((m) => m.replace(/^@/, "").toLowerCase()),
+    metrics: { likes: p.likes, comments: p.comments, views: 0, shares: 0 },
+    sentiment: averageSentiment([p.caption ?? ""]),
+    deepfakeScore: 0,
+    postedAt: p.postedAt ? new Date(p.postedAt) : new Date(),
+    embedding: embedText(`${p.caption ?? ""} ${(p.hashtags ?? []).join(" ")}`),
+  }));
+
+  const handle = v.handle.replace(/^@/, "");
+  const creator: GeneratedCreator = {
+    name: v.fullName || handle,
+    handle,
+    avatarUrl: v.avatarUrl ?? `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(handle)}`,
+    bio: (v.bio ?? "").slice(0, 280),
+    categoryTags,
+    location: country,
+    country,
+    languages,
+    followerTotal: v.followers,
+    engagementRate: Math.round(engagementRate * 100) / 100,
+    growthRate: 0,
+    aiGeneratedScore: 0,
+    verified: Boolean(v.verified),
+    embedding: embedCreatorText({ name: v.fullName ?? handle, bio: v.bio, categoryTags, location: country, languages, topHashtags: content.flatMap((c) => c.hashtags) }),
+    accounts: [
+      {
+        platform: v.platform,
+        handle,
+        url: `https://www.${v.platform}.com/${handle}`,
+        followers: v.followers,
+        engagementRate: Math.round(engagementRate * 100) / 100,
+        growthRate: 0,
+        postsCount: posts.length,
+        metrics: { avgLikes: v.avgLikes ?? Math.round(likeMean), avgComments: v.avgComments ?? 0 },
+        history: [],
+        audience,
+        content,
+      },
+    ],
+  };
+
+  return { source: v.platform, externalId: v.externalId, platform: v.platform, audienceEstimated, creator };
 }

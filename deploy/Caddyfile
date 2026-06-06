@@ -20,3 +20,18 @@
 		X-Frame-Options "SAMEORIGIN"
 	}
 }
+
+# Quantara marketing site — static files served from /var/www/html on the host
+# (bind-mounted into this container as /srv/wearequantara; see docker-compose.prod.yml).
+wearequantara.com, www.wearequantara.com {
+	encode zstd gzip
+	root * /srv/wearequantara
+	file_server
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+	}
+}

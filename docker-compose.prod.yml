@@ -90,6 +90,8 @@ services:
       ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Quantara marketing site (wearequantara.com) — static files on the host.
+      - /var/www/html:/srv/wearequantara:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

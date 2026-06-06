@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { QWordmark } from "@/components/brand/logo";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: LineChart },
+  { href: "/dashboard", label: "Dashboard", icon: LineChart },
   { href: "/search", label: "Discover", icon: Search },
   { href: "/lookalike", label: "Lookalikes", icon: Copy },
   { href: "/overlap", label: "Audience Overlap", icon: GitCompare },
@@ -31,7 +31,7 @@ export function AppSidebar({ role }: { role?: string }) {
       </div>
       <nav className="flex-1 space-y-1 p-3">
         {nav.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
             <Link

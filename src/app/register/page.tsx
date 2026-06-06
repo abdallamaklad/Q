@@ -31,7 +31,7 @@ export default function RegisterPage() {
       return;
     }
     await signIn("credentials", { email: form.email, password: form.password, redirect: false });
-    router.push("/");
+    router.push("/dashboard");
     router.refresh();
   }
 

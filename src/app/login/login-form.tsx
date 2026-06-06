@@ -2,11 +2,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
+/**
+ * Sign-in form. Auth logic is unchanged — `signIn("credentials")` with
+ * `redirect:false`, generic error handling, redirect to /dashboard on success.
+ * Only the markup/styling was updated to the marketing `.field`/`.auth-btn` look.
+ */
 export function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -26,28 +27,40 @@ export function LoginForm() {
       setError("Sign-in failed. Check your credentials, or that the database is running and seeded (npm run setup).");
       return;
     }
-    router.push("/");
+    router.push("/dashboard");
     router.refresh();
   }
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <form onSubmit={onSubmit} style={{ marginTop: 32 }}>
+      <div className="field">
+        <label htmlFor="email">Email</label>
+        <input
+          id="email"
+          type="email"
+          placeholder="you@company.com"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="password">Password</label>
+        <input
+          id="password"
+          type="password"
+          placeholder="••••••••"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+      </div>
+      {error && <p className="auth-error" role="alert">{error}</p>}
+      <button type="submit" className="btn btn-primary auth-btn" disabled={loading}>
+        {loading ? "Signing in…" : "Sign in"}
+      </button>
+    </form>
   );
 }

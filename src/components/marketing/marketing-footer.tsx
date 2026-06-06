@@ -29,7 +29,8 @@ export function MarketingFooter({ authed }: { authed: boolean }) {
             <h4>Company</h4>
             <Link href="/about">About</Link>
             <Link href="/insights">Insights</Link>
-            <a href="mailto:qulture@wearequantara.com">Contact</a>
+            {/* Tally popup (embed.js loaded in the root layout intercepts this hash link). */}
+            <a href="#tally-open=zxdZdq">Contact</a>
           </div>
 
           <div className="footer-col">

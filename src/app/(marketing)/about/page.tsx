@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { QuantaraLogo } from "@/components/marketing/quantara-logo";
+import { TallyCta } from "@/components/marketing/tally-cta";
 
 export const metadata: Metadata = {
   title: "About — Qulture",
   description:
-    "Qulture is the precision layer for the creator economy, engineered to find the voices shaping markets before anyone else does. A Quantara product.",
+    "Qulture is the precision layer for the creator economy — engineered to find the voices shaping markets before anyone else does. A Quantara product.",
 };
 
 const QUANTARA_URL = "https://www.wearequantara.com";
@@ -43,7 +44,7 @@ export default function AboutPage() {
         <div className="container rel" style={{ maxWidth: 840 }}>
           <span className="eyebrow reveal">About Qulture</span>
           <h1 className="display reveal d1" style={{ marginTop: 24 }}>
-            Culture doesn&apos;t<br />ask <em>permission.</em>
+            <span style={{ color: "var(--brand)" }}>Q</span>ulture doesn&apos;t<br />ask <em>permission.</em>
           </h1>
           <p className="lead reveal d2" style={{ marginTop: 24, maxWidth: 620 }}>
             It spreads. It shifts. It converts — before the algorithm even notices. Qulture exists to map that movement: the
@@ -131,9 +132,12 @@ export default function AboutPage() {
           <p className="lead reveal d2" style={{ margin: "18px auto 0", maxWidth: 440 }}>
             Questions, partnerships, or press — reach the Qulture team directly.
           </p>
-          <a href="mailto:qulture@wearequantara.com" className="btn btn-primary reveal d3" style={{ marginTop: 32 }}>
-            qulture@wearequantara.com
-          </a>
+          <div className="flex gap-s wrap reveal d3" style={{ justifyContent: "center", alignItems: "center", marginTop: 32 }}>
+            <TallyCta />
+            <a href="mailto:qulture@wearequantara.com" className="btn btn-ghost">
+              qulture@wearequantara.com
+            </a>
+          </div>
         </div>
       </section>
     </>

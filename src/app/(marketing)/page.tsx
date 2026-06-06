@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { TallyCta } from "@/components/marketing/tally-cta";
 
 export const metadata: Metadata = {
   title: "Qulture — Discover what moves.",
@@ -221,7 +222,7 @@ export default function HomePage() {
             Join the brands using Qulture to find the voices that move markets.
           </p>
           <div className="flex gap-s wrap reveal d2" style={{ justifyContent: "center", marginTop: 36 }}>
-            <Link href="/login" className="btn btn-primary">Get started</Link>
+            <TallyCta />
             <Link href="/about" className="btn btn-ghost">Learn more</Link>
           </div>
         </div>

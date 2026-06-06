@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { MarketingWordmark } from "@/components/marketing/wordmark";
 import { CategoryFilter } from "@/components/marketing/category-filter";
 import { NewsletterForm } from "@/components/marketing/newsletter-form";
+import { featuredArticle } from "@/lib/marketing/insights";
 
 export const metadata: Metadata = {
   title: "Insights — Qulture",
@@ -37,15 +38,14 @@ export default function InsightsPage() {
             style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 0, padding: 0, overflow: "hidden", alignItems: "stretch" }}
           >
             <div style={{ padding: 48, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <span className="tag" style={{ alignSelf: "flex-start" }}>Featured · AI &amp; Discovery</span>
+              <span className="tag" style={{ alignSelf: "flex-start" }}>Featured · {featuredArticle.category}</span>
               <h2 className="display" style={{ fontSize: "clamp(26px,3vw,38px)", marginTop: 24, lineHeight: 1.1 }}>
-                How AI is rewriting influencer discovery in 2026
+                <Link href={`/insights/${featuredArticle.slug}`}>{featuredArticle.title}</Link>
               </h2>
               <p style={{ color: "var(--muted)", marginTop: 18, fontSize: 16, lineHeight: 1.7 }}>
-                Natural-language search, predictive performance, and synthetic-creator detection are collapsing a multi-week
-                workflow into minutes. Here&apos;s what&apos;s actually changing — and what&apos;s hype.
+                {featuredArticle.excerpt}
               </p>
-              <Link href="/login" className="btn btn-ghost" style={{ alignSelf: "flex-start", marginTop: 28 }}>
+              <Link href={`/insights/${featuredArticle.slug}`} className="btn btn-ghost" style={{ alignSelf: "flex-start", marginTop: 28 }}>
                 Read article
                 <svg viewBox="0 0 16 16" fill="none">
                   <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />

@@ -204,3 +204,27 @@
 .mkt .flex { display: flex; } .mkt .gap-s { gap: 12px; } .mkt .gap-m { gap: 20px; }
 .mkt .wrap { flex-wrap: wrap; }
 .mkt .rel { position: relative; z-index: 2; }
+
+/* ─── Article (Insights detail) ─── */
+.mkt .article-hero { padding-top: 150px; padding-bottom: 36px; position: relative; overflow: hidden; }
+.mkt .article-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-top: 22px; font-family: var(--font-m); font-size: 12px; letter-spacing: 0.04em; color: var(--muted); }
+.mkt .article-meta .dot { color: var(--muted-2); }
+.mkt .article { max-width: 720px; margin: 0 auto; }
+.mkt .article > p { color: rgba(238, 238, 255, 0.82); font-size: 17px; line-height: 1.8; margin: 0 0 22px; }
+.mkt .article h2 { font-family: var(--font-d); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; color: var(--white); font-size: clamp(24px, 3vw, 30px); margin: 48px 0 16px; }
+.mkt .article h3 { font-family: var(--font-d); font-weight: 700; letter-spacing: -0.02em; color: var(--white); font-size: 20px; margin: 32px 0 12px; }
+.mkt .article ul, .mkt .article ol { margin: 0 0 22px; padding-left: 22px; color: rgba(238, 238, 255, 0.82); font-size: 17px; line-height: 1.8; }
+.mkt .article li { margin-bottom: 10px; }
+.mkt .article li::marker { color: var(--brand); }
+.mkt .article a { color: var(--brand); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+.mkt .article a:hover { border-bottom-color: var(--brand); }
+.mkt .article strong { color: var(--white); font-weight: 600; }
+.mkt .article .takeaways { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 28px 32px; margin: 40px 0; }
+.mkt .article .takeaways h2 { margin-top: 0; font-size: 20px; }
+.mkt .article .takeaways ul { margin-bottom: 0; }
+.mkt .article-related { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+@media (max-width: 768px) {
+  .mkt .article-hero { padding-top: 116px; }
+  .mkt .article > p, .mkt .article ul, .mkt .article ol { font-size: 16px; }
+  .mkt .article-related { grid-template-columns: 1fr; }
+}

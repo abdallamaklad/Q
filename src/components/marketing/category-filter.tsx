@@ -1,15 +1,17 @@
 "use client";
 import { useState } from "react";
-import { accentVar, articles, filterCategories, type Article } from "@/lib/marketing/insights";
+import Link from "next/link";
+import { accentVar, gridArticles, filterCategories, type Article } from "@/lib/marketing/insights";
 
 /**
  * Client-side Insights explorer: category filter pills + the article grid.
- * Grid cards are always visible (no scroll-reveal) so re-filtering never leaves
- * freshly-shown cards stuck in the hidden reveal state.
+ * Cards link to their full article. Grid cards are always visible (no
+ * scroll-reveal) so re-filtering never leaves freshly-shown cards stuck in the
+ * hidden reveal state. Filters by `category` (= articleSection).
  */
 export function CategoryFilter() {
   const [active, setActive] = useState<(typeof filterCategories)[number]>("All");
-  const visible = active === "All" ? articles : articles.filter((a) => a.category === active);
+  const visible = active === "All" ? gridArticles : gridArticles.filter((a) => a.category === active);
 
   return (
     <>
@@ -47,15 +49,17 @@ export function CategoryFilter() {
 
 function ArticleCard({ article }: { article: Article }) {
   return (
-    <article className="card" style={{ padding: 0, overflow: "hidden" }}>
-      <div style={{ height: 160, background: article.cover }} />
-      <div style={{ padding: 26 }}>
-        <span className="mono" style={{ color: accentVar[article.accent], fontSize: 11, letterSpacing: "0.08em" }}>
-          {article.category.toUpperCase()} · {article.readMin} MIN
-        </span>
-        <h3 className="display" style={{ fontSize: 20, marginTop: 14, lineHeight: 1.2 }}>{article.title}</h3>
-        <p style={{ color: "var(--muted)", marginTop: 12, fontSize: 14 }}>{article.excerpt}</p>
-      </div>
-    </article>
+    <Link href={`/insights/${article.slug}`} aria-label={article.title}>
+      <article className="card" style={{ padding: 0, overflow: "hidden", height: "100%" }}>
+        <div style={{ height: 160, background: article.cover }} />
+        <div style={{ padding: 26 }}>
+          <span className="mono" style={{ color: accentVar[article.accent], fontSize: 11, letterSpacing: "0.08em" }}>
+            {article.category.toUpperCase()} · {article.readMin} MIN
+          </span>
+          <h3 className="display" style={{ fontSize: 20, marginTop: 14, lineHeight: 1.2 }}>{article.title}</h3>
+          <p style={{ color: "var(--muted)", marginTop: 12, fontSize: 14 }}>{article.excerpt}</p>
+        </div>
+      </article>
+    </Link>
   );
 }

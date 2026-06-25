@@ -22,6 +22,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Tally embed — powers the "Get in touch" lead-capture popup (form id zxdZdq)
             via [data-tally-open] and #tally-open= links. Loaded once for every route. */}
         <Script src="https://tally.so/widgets/embed.js" strategy="afterInteractive" />
+        {/* Google Analytics (gtag.js) — loaded once for every route. */}
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-HHJESFE1RC" strategy="afterInteractive" />
+        <Script id="gtag-init" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-HHJESFE1RC');`}
+        </Script>
       </body>
     </html>
   );

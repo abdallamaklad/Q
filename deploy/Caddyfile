@@ -3,10 +3,11 @@
 #
 # This Caddy is shared by every site on this VPS. The blocks below for
 # verbito.ai, doyouknow.app, supabase.verbito.ai and affiliate.verbito.ai belong
-# to those products, whose own deploy scripts keep them current (they find
-# their marker comments, e.g. "# Verbito static app."). They are committed here
-# as well because this repo's deploy runs `git reset --hard`, which used to drop
-# them until each product deployed again. One block per domain.
+# to those products, whose own deploy scripts keep them current by finding
+# each block's own marker comment line. They are committed here as well because
+# this repo's deploy runs `git reset --hard`, which used to drop them until each
+# product deployed again. One block per domain. Never quote a marker line in a
+# comment: a deploy script would match it and insert a duplicate block.
 {
 	email {$ACME_EMAIL}
 }

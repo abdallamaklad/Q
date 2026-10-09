@@ -1,5 +1,12 @@
 # Caddy auto-provisions and renews TLS certificates from Let's Encrypt for the
 # domain set in $DOMAIN, and reverse-proxies to the Next.js web container.
+#
+# This Caddy is shared by every site on this VPS. The blocks below for
+# verbito.ai, doyouknow.app, supabase.verbito.ai and affiliate.verbito.ai belong
+# to those products, whose own deploy scripts keep them current (they find
+# their marker comments, e.g. "# Verbito static app."). They are committed here
+# as well because this repo's deploy runs `git reset --hard`, which used to drop
+# them until each product deployed again. One block per domain.
 {
 	email {$ACME_EMAIL}
 }
@@ -21,6 +28,36 @@
 	}
 }
 
+# Verbito static app.
+verbito.ai, www.verbito.ai {
+	encode zstd gzip
+	root * /srv/verbito
+
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	@staticAssets path *.jpg *.jpeg *.png *.webp *.svg *.ico *.woff *.woff2
+	handle @staticAssets {
+		header Cache-Control "public, max-age=604800"
+		file_server
+	}
+
+	handle {
+		header Cache-Control "no-cache"
+		try_files {path} {path}.html {path}/index.html /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+	}
+}
+
 # Quantara marketing site — static files served from /var/www/html on the host
 # (bind-mounted into this container as /srv/wearequantara; see docker-compose.prod.yml).
 wearequantara.com, www.wearequantara.com {
@@ -33,5 +70,87 @@ wearequantara.com, www.wearequantara.com {
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		X-Frame-Options "SAMEORIGIN"
+	}
+}
+
+# doyouknow.app static bilingual editorial site.
+doyouknow.app, www.doyouknow.app {
+	encode zstd gzip
+	root * /srv/doyouknow
+
+	@mutable-assets path /assets/css/style.css /assets/js/site.js /assets/js/search-index.en.json /assets/js/search-index.ar.json
+	header @mutable-assets Cache-Control "public, max-age=300, must-revalidate"
+
+	@immutable {
+		path /assets/*
+		not path /assets/css/style.css /assets/js/site.js /assets/js/search-index.en.json /assets/js/search-index.ar.json
+	}
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	@html path *.html / /en/* /ar/*
+	header @html Cache-Control "public, max-age=300, must-revalidate"
+
+	try_files {path} {path}/index.html
+	file_server
+
+	# Serve the language-appropriate custom 404 page (missing URLs
+	# previously returned an empty 404 body).
+	handle_errors {
+		@notfound expression {err.status_code} == 404
+		handle @notfound {
+			@ar path /ar/*
+			handle @ar {
+				rewrite * /ar/404.html
+				file_server
+			}
+			handle {
+				rewrite * /en/404.html
+				file_server
+			}
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://buttondown.com; font-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+}
+
+# Verbito Supabase (self-hosted).
+supabase.verbito.ai {
+	reverse_proxy supabase-kong:8000
+}
+
+# Verbito affiliate portal.
+affiliate.verbito.ai {
+	encode zstd gzip
+	root * /srv/verbito
+
+	handle /robots.txt {
+		rewrite * /affiliate-robots.txt
+		file_server
+	}
+
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle {
+		header Cache-Control "no-cache"
+		try_files {path} /affiliate.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		X-Robots-Tag "noindex, nofollow"
 	}
 }

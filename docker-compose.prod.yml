@@ -92,6 +92,10 @@ services:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       # Quantara marketing site (wearequantara.com) — static files on the host.
       - /var/www/html:/srv/wearequantara:ro
+      # Verbito static site.
+      - /var/www/verbito/current:/srv/verbito:ro
+      # doyouknow.app static site.
+      - /var/www/doyouknow/current:/srv/doyouknow:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

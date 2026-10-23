@@ -4,7 +4,7 @@
 # (`npm run start`) and the BullMQ worker (`npm run worker`); the worker command
 # is overridden in docker-compose.prod.yml. Prisma needs OpenSSL at runtime.
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-bookworm-slim AS base
+FROM node:22-bookworm-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app

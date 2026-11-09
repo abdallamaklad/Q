@@ -2,12 +2,14 @@
 # domain set in $DOMAIN, and reverse-proxies to the Next.js web container.
 #
 # This Caddy is shared by every site on this VPS. The blocks below for
-# verbito.ai, doyouknow.app, supabase.verbito.ai and affiliate.verbito.ai belong
-# to those products, whose own deploy scripts keep them current by finding
-# each block's own marker comment line. They are committed here as well because
-# this repo's deploy runs `git reset --hard`, which used to drop them until each
-# product deployed again. One block per domain. Never quote a marker line in a
-# comment: a deploy script would match it and insert a duplicate block.
+# verbito.ai, atlas.verbito.ai, doyouknow.app, supabase.verbito.ai and
+# affiliate.verbito.ai belong to those products, whose own deploy scripts keep
+# them current by finding each block's own marker comment line. They are
+# committed here as well because this repo's deploy runs `git reset --hard`,
+# which used to drop them until each product deployed again. One block per
+# domain. Never quote a marker line in a comment: a deploy script would match it
+# and insert a duplicate block. The deploy workflow refuses to deploy a Caddyfile
+# that fails `caddy validate` or lacks the www.verbito.ai / atlas.verbito.ai blocks.
 {
 	email {$ACME_EMAIL}
 }
@@ -29,10 +31,26 @@
 	}
 }
 
+# Managed by verbito.ai scripts/deploy/deploy-vps.sh — keep in sync; do not edit here.
+
 # Verbito static app.
-verbito.ai, www.verbito.ai {
+verbito.ai {
 	encode zstd gzip
 	root * /srv/verbito
+
+	# SEO routing (organic tech audit 2026-11-05, item 1). Every redirect keeps
+	# the query string ({?query}): UTM and fbclid on paid traffic depend on it.
+	# Redirect targets are absolute so a path such as //example.com/ can never
+	# turn into a protocol-relative open redirect.
+
+	# Trailing slash: 308 to the canonical no-slash URL. "/" itself is untouched.
+	@trailingSlash path_regexp trailingSlash ^(/.*?)/+$
+	redir @trailingSlash https://verbito.ai{re.trailingSlash.1}{?query} 308
+
+	# Old URLs that the app only redirected client-side.
+	redir /course https://verbito.ai/courses{?query} 308
+	redir /compare https://verbito.ai/compare/best-free-ai-prompt-generators{?query} 308
+	redir /refund https://verbito.ai/refund-policy{?query} 308
 
 	handle /assets/* {
 		header Cache-Control "public, max-age=31536000, immutable"
@@ -45,9 +63,36 @@ verbito.ai, www.verbito.ai {
 		file_server
 	}
 
+	# Build artifacts that are not pages on this host: a real 404.
+	# /atlas is dist/atlas, served only on atlas.verbito.ai (its /atlas/full/ data is gated there).
+	@notPages path /404 /404.html /affiliate /affiliate.html /affiliate-robots.txt /atlas /atlas/*
+	handle @notPages {
+		error 404
+	}
+
+	# Client-only app routes (src/App.tsx). They get their prerendered noindex
+	# shell when one exists, else the app shell. Every other path must be a real
+	# file or prerendered page, or it is a 404. The build (scripts/prerender.mjs)
+	# and tests/routing.test.mjs fail if an App.tsx route is neither prerendered,
+	# listed here, nor redirected above.
+	@spaRoutes path /dashboard /account /admin /billing /collections /saved-prompts /welcome /login /signup /forgot-password /reset-password /pro /checkout /checkout/complete /checkout/guest /checkout/guest/complete /course/dashboard /course/certificate /course/lesson/* /course/ai-image-generation-mastery/dashboard /course/ai-image-generation-mastery/certificate /course/ai-image-generation-mastery/lesson/* /prompt-kit/pack /p/*
+	handle @spaRoutes {
+		header Cache-Control "no-cache"
+		try_files {path}.html /index.html
+		file_server
+	}
+
 	handle {
 		header Cache-Control "no-cache"
-		try_files {path} {path}.html {path}/index.html /index.html
+		# {path}/index.html serves "/" (dist/index.html is the only directory index).
+		try_files {path} {path}.html {path}/index.html =404
+		file_server
+	}
+
+	# Unknown paths: status 404 with the prerendered noindex page.
+	handle_errors 404 {
+		header Cache-Control "no-cache"
+		rewrite * /404.html
 		file_server
 	}
 
@@ -58,6 +103,11 @@ verbito.ai, www.verbito.ai {
 		X-Frame-Options "SAMEORIGIN"
 	}
 }
+
+www.verbito.ai {
+	redir https://verbito.ai{uri} 308
+}
+# End of Verbito static app.
 
 # Quantara marketing site — static files served from /var/www/html on the host
 # (bind-mounted into this container as /srv/wearequantara; see docker-compose.prod.yml).
@@ -121,10 +171,14 @@ doyouknow.app, www.doyouknow.app {
 	}
 }
 
+# Managed by verbito.ai scripts/deploy/deploy-vps.sh — keep in sync; do not edit here.
+
 # Verbito Supabase (self-hosted).
 supabase.verbito.ai {
 	reverse_proxy supabase-kong:8000
 }
+
+# Managed by verbito.ai scripts/deploy/deploy-vps.sh — keep in sync; do not edit here.
 
 # Verbito affiliate portal.
 affiliate.verbito.ai {
@@ -134,6 +188,13 @@ affiliate.verbito.ai {
 	handle /robots.txt {
 		rewrite * /affiliate-robots.txt
 		file_server
+	}
+
+	# Same release root as verbito.ai: the Atlas files (and its gated /atlas/full/
+	# data) are served only on atlas.verbito.ai.
+	@atlasFiles path /atlas /atlas/*
+	handle @atlasFiles {
+		respond 404
 	}
 
 	handle /assets/* {
@@ -155,3 +216,62 @@ affiliate.verbito.ai {
 		X-Robots-Tag "noindex, nofollow"
 	}
 }
+
+# Managed by verbito.ai scripts/deploy/deploy-vps.sh — keep in sync; do not edit here.
+
+# Verbito Open Source AI Atlas.
+atlas.verbito.ai {
+	encode zstd gzip
+	root * /srv/verbito/atlas
+
+	# The paid Atlas: only for entitled accounts (supabase/functions/atlas-gate).
+	handle /full/* {
+		forward_auth supabase-kong:8000 {
+			uri /functions/v1/atlas-gate
+			header_up apikey "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgyOTAzMDgxLCJleHAiOjIwOTgyNjMwODF9.APsBU8Wv3vSYfuagwT7R-7oZWw6crpBIaGvs2mwUIyQ"
+			header_up Authorization "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgyOTAzMDgxLCJleHAiOjIwOTgyNjMwODF9.APsBU8Wv3vSYfuagwT7R-7oZWw6crpBIaGvs2mwUIyQ"
+		}
+		@fullHashed path_regexp \.[0-9a-f]{10}\.[a-z]+$
+		header @fullHashed ?Cache-Control "private, max-age=31536000, immutable"
+		@fullOther not path_regexp \.[0-9a-f]{10}\.[a-z]+$
+		header @fullOther ?Cache-Control "private, no-cache"
+		header X-Robots-Tag "noindex, nofollow"
+		file_server
+	}
+
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle /data/* {
+		@dataHashed path_regexp \.[0-9a-f]{10}\.json$
+		header @dataHashed Cache-Control "public, max-age=31536000, immutable"
+		@dataOther not path_regexp \.[0-9a-f]{10}\.json$
+		header @dataOther Cache-Control "public, max-age=3600"
+		file_server
+	}
+
+	handle {
+		header Cache-Control "no-cache"
+		try_files {path} {path}.html {path}/index.html =404
+		file_server
+	}
+
+	# Unknown paths: status 404 with the prerendered page (Arabic under /ar).
+	handle_errors 404 {
+		header Cache-Control "no-cache"
+		@arabic path /ar /ar/*
+		rewrite @arabic /ar/404.html
+		rewrite * /404.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+	}
+}
+# End of Verbito Open Source AI Atlas.

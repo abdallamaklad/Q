@@ -27,6 +27,14 @@ jobs:
       - run: npx tsc --noEmit
       - run: npx eslint .
       - run: npx vitest run
+      # deploy/Caddyfile drives the Caddy shared by every site on the VPS: a bad file takes them all down.
+      - name: Caddyfile guard
+        run: |
+          for site in www.verbito.ai atlas.verbito.ai; do
+            grep -qxF "$site {" deploy/Caddyfile || { echo "deploy/Caddyfile has no $site block" >&2; exit 1; }
+          done
+          docker run --rm -e DOMAIN=qulture.tech -e ACME_EMAIL=ci@example.com -v "$PWD/deploy:/etc/caddy:ro" \
+            caddy:2.11.3-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
   deploy:
     name: Deploy to VPS
@@ -47,6 +55,16 @@ jobs:
             set -e
             cd ~/qulture
             git fetch --all --prune
+            # Gate the shared Caddy BEFORE the reset rewrites deploy/Caddyfile: the new file must keep the
+            # Verbito-managed blocks and pass `caddy validate` in the running Caddy, or nothing changes.
+            git show origin/main:deploy/Caddyfile > /tmp/Caddyfile.next
+            for site in www.verbito.ai atlas.verbito.ai; do
+              grep -qxF "$site {" /tmp/Caddyfile.next || { echo "deploy/Caddyfile has no $site block: not deploying" >&2; exit 1; }
+            done
+            if docker ps --format '{{.Names}}' | grep -qx qulture-caddy-1; then
+              docker cp /tmp/Caddyfile.next qulture-caddy-1:/tmp/Caddyfile.next
+              docker exec qulture-caddy-1 caddy validate --config /tmp/Caddyfile.next --adapter caddyfile
+            fi
             git reset --hard origin/main
             # --pull: always rebuild on the current base image (security releases reuse the same tag)
             docker compose -f docker-compose.prod.yml --env-file .env build --pull
